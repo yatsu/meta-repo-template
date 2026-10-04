@@ -1,0 +1,9 @@
+# Repositories managed by this workspace.
+# Format: <name> <git-url> [branch]
+#   name   : cloned into repos/<name>/. Letters, digits, ".", "_" and "-" only
+#   branch : branch to check out when cloning. Defaults to the remote's default branch
+# Anything after "#" at the start of a line or after whitespace is a comment.
+#
+# Examples:
+# foo    https://github.com/xxx-xxx/foo.git
+# bar    https://github.com/xxx-xxx/bar.git  main

@@ -1,0 +1,7 @@
+# Managed repos (each one is an independent git repository)
+/repos/
+/worktrees/
+
+# Personal settings
+CLAUDE.local.md
+.claude/settings.local.json

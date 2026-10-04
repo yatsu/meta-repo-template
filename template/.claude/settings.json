@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(just --list)",
+      "Bash(just status)",
+      "Bash(just status *)",
+      "Bash(just wt-status *)",
+      "Bash(just wt-list)"
+    ]
+  }
+}

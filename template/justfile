@@ -1,0 +1,41 @@
+set positional-arguments
+
+# List recipes
+help:
+    @just --list --unsorted
+
+# Clone repos from repos.txt into repos/ (skips existing ones)
+bootstrap *repos:
+    @scripts/bootstrap.sh "$@"
+
+# Fetch, then fast-forward pull repos without uncommitted changes
+sync *repos:
+    @scripts/sync.sh "$@"
+
+# Show branch, uncommitted changes, and ahead/behind per repo
+status *repos:
+    @scripts/status.sh "$@"
+
+# Run a command in each repo root (e.g. just exec 'git log -1 --oneline')
+exec cmd *repos:
+    @scripts/exec.sh "$@"
+
+# Add a repo to repos.txt and clone it
+add name url branch="":
+    @scripts/add.sh "$@"
+
+# Create same-branch worktrees under worktrees/<branch>/<repo>/
+wt-new branch *repos:
+    @scripts/wt-new.sh "$@"
+
+# Show status of a worktree set
+wt-status branch *repos:
+    @scripts/status.sh -w "$@"
+
+# List worktree sets and the repos in each
+wt-list:
+    @scripts/wt-list.sh
+
+# Remove a worktree set (branches are kept; --force discards changes)
+wt-rm branch *flags:
+    @scripts/wt-rm.sh "$@"
