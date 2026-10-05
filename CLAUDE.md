@@ -15,8 +15,12 @@ Files at the repository root are for developing the template and are not install
   The comment above a recipe is its `just --list` description.
 - `template/scripts/_lib.sh`: shared helpers (manifest parsing, name validation, worktree sets, base records, colors).
   Every script sources it. A worktree branch's base is stored in git config as `branch.<branch>.meta-base`.
+  `wt-new` symlinks `worktrees/<branch>/.claude/settings.json` to the root `.claude/settings.json` (Claude Code reads
+  that file only from its start directory); `wt-rm` removes it and does not report it as a leftover file.
 - `template/scripts/*.sh`: one script per recipe.
 - `template/repos.txt`: the manifest, `<name> <git-url> [branch]` per line, `#` comments. Ships with examples only.
+  A `-` URL marks a local-only repo that `bootstrap` never clones. Decide whether to fetch by the repo's actual
+  `origin` remote (`has_origin`), not by the manifest URL, since a local-only repo may still have one.
 - `template/AGENTS-meta-repo.md`: instructions users adopt as their workspace's CLAUDE.md or AGENTS.md.
 - `template/.claude/settings.json`: allows read-only recipes without prompts in user workspaces.
 - `template/.gitignore`: entries merged into the workspace's `.gitignore`, never copied as a file.

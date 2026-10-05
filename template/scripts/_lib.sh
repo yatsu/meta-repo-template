@@ -57,6 +57,12 @@ selected() {
 
 is_git_dir() { git -C "$1" rev-parse --git-dir >/dev/null 2>&1; }
 
+# A "-" URL in repos.txt marks a local-only repo: bootstrap does not clone it,
+# and the user places the repository at repos/<name>/ themselves.
+is_local_only() { [[ $1 == "-" ]]; }
+
+has_origin() { git -C "$1" remote get-url origin >/dev/null 2>&1; }
+
 is_dirty() { [[ -n $(git -C "$1" status --porcelain 2>/dev/null) ]]; }
 
 # A worktree set is the directory worktrees/<branch>/, holding one worktree per repo.
@@ -104,5 +110,44 @@ resolve_base_ref() {
         echo "$base"
     else
         return 1
+    fi
+}
+
+# Claude Code reads the shared .claude/settings.json only from the directory it starts in, so each
+# worktree set gets a relative symlink to the workspace's file: worktrees/<branch>/.claude/settings.json.
+settings_link_target() {
+    local branch=$1 up="../../" part
+    # One "../" for .claude and one for worktrees, plus one per component of the branch name
+    local IFS=/
+    for part in $branch; do
+        up="../$up"
+    done
+    echo "$up.claude/settings.json"
+}
+
+link_settings() {
+    local branch=$1 dir="$WORKTREES_DIR/$1/.claude"
+    [[ -f $ROOT/.claude/settings.json ]] || return 0
+    [[ -e $dir/settings.json || -L $dir/settings.json ]] && return 0
+    mkdir -p "$dir"
+    ln -s "$(settings_link_target "$branch")" "$dir/settings.json"
+}
+
+is_settings_link() {
+    local link="$WORKTREES_DIR/$1/.claude/settings.json"
+    [[ -L $link && $(readlink "$link") == "$(settings_link_target "$1")" ]]
+}
+
+# True if worktrees/<branch>/.claude holds nothing but the link from link_settings.
+is_managed_settings_dir() {
+    is_settings_link "$1" && [[ $(find "$WORKTREES_DIR/$1/.claude" -mindepth 1 | wc -l) -eq 1 ]]
+}
+
+# Remove the symlink created by link_settings; a file the user put there is left alone.
+unlink_settings() {
+    local branch=$1 dir="$WORKTREES_DIR/$1/.claude"
+    if is_settings_link "$branch"; then
+        rm "$dir/settings.json"
+        rmdir "$dir" 2>/dev/null || true
     fi
 }

@@ -36,6 +36,6 @@ wt-status branch *repos:
 wt-list:
     @scripts/wt-list.sh
 
-# Remove a worktree set (branches are kept; --force discards changes)
+# Remove a worktree set and its unused branches (--force discards changes)
 wt-rm branch *flags:
     @scripts/wt-rm.sh "$@"

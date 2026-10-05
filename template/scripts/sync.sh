@@ -15,6 +15,10 @@ while read -r name _url _branch <&3; do
         continue
     fi
     info "$name"
+    if ! has_origin "$dir"; then
+        echo "  ${C_DIM}no remote${C_RESET}: skipped"
+        continue
+    fi
     git -C "$dir" fetch --prune --quiet || {
         warn "$name: fetch failed"
         failed=1

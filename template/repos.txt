@@ -1,9 +1,15 @@
 # Repositories managed by this workspace.
 # Format: <name> <git-url> [branch]
-#   name   : cloned into repos/<name>/. Letters, digits, ".", "_" and "-" only
-#   branch : branch to check out when cloning. Defaults to the remote's default branch
+#   name    : cloned into repos/<name>/. Letters, digits, ".", "_" and "-" only
+#   git-url : anything `git clone` accepts, including a local path (absolute, or relative to
+#             this directory; "~" is not expanded). Use "-" for a local-only repo that is not
+#             cloned: put the repository at repos/<name>/ yourself.
+#   branch  : branch to check out when cloning. Defaults to the remote's default branch
+# Fields are separated by whitespace, so paths cannot contain spaces.
 # Anything after "#" at the start of a line or after whitespace is a comment.
 #
 # Examples:
 # foo    https://github.com/xxx-xxx/foo.git
 # bar    https://github.com/xxx-xxx/bar.git  main
+# baz    ../baz
+# qux    -

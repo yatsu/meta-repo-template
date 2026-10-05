@@ -38,8 +38,10 @@ the recipe exits non-zero at the end if any repository failed.
 - `just status [repo...]`: Show each repository's branch, number of uncommitted changes, and ahead/behind counts against its upstream.
   Read-only and offline, so counts reflect the last fetch. Use it freely to orient yourself.
 - `just sync [repo...]`: Fetch every repository, then fast-forward pull those with no uncommitted changes.
-  Repositories with local changes or no upstream are only fetched. Never merges or rebases.
+  Repositories with local changes or no upstream are only fetched; repositories without an `origin` remote are skipped.
+  Never merges or rebases.
 - `just bootstrap [repo...]`: Clone repositories listed in `repos.txt` that are missing from `repos/`. Existing clones are skipped.
+  Repositories with `-` as the URL are local-only: they are never cloned, and a missing one must be placed by the user.
 - `just add <name> <url> [branch]`: Append a repository to `repos.txt` and clone it. Ask the user before adding repositories.
 - `just exec '<cmd>' [repo...]`: Run a shell command at the root of each repository, for example `just exec 'git log -1 --oneline'`.
   Prefer it over hand-written loops for read-only checks across repositories.
@@ -54,7 +56,8 @@ the recipe exits non-zero at the end if any repository failed.
 - `just wt-status <branch> [repo...]`: Same as `just status`, for the worktrees of `<branch>`, plus a BASE column with each
   repository's recorded base and ahead/behind counts against it (`(unknown)` when no base is recorded).
 - `just wt-list`: List existing worktree sets by branch name, with the repositories in each.
-- `just wt-rm <branch> [--force]`: Remove the worktrees of `<branch>` and any parent directories left empty. Branches are kept.
+- `just wt-rm <branch> [--force]`: Remove the worktrees of `<branch>` and any parent directories left empty.
+  Deletes a branch only if it has no commits on top of its recorded base and was never pushed; other branches are kept.
   Worktrees with uncommitted changes are skipped unless `--force` is given; only use `--force` when the user asks.
   Other files in `worktrees/<branch>/` are never deleted and are reported as kept.
 

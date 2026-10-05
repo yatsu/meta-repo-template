@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Append a repo to repos.txt and clone it.
+# Append a repo to repos.txt and clone it. With URL "-", the repo is local-only and not cloned.
 # usage: add.sh <name> <url> [branch]
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"

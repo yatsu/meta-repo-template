@@ -5,6 +5,7 @@
 # else from the branch set in repos.txt, else from the upstream default branch.
 # The base is recorded as branch.<branch>.meta-base in each repo's git config. For a repo that
 # already has the branch or the worktree, repo@<base> only updates the record.
+# Also links worktrees/<branch>/.claude/settings.json to the workspace's .claude/settings.json.
 # usage: wt-new.sh <branch> [repo[@base]...]   (defaults to every cloned repo)
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
@@ -88,7 +89,9 @@ while read -r name _url manifest_branch <&3; do
         continue
     fi
 
-    git -C "$src" fetch --quiet origin 2>/dev/null || warn "$name: fetch failed, using local refs"
+    if has_origin "$src"; then
+        git -C "$src" fetch --quiet origin 2>/dev/null || warn "$name: fetch failed, using local refs"
+    fi
     if [[ -n $requested ]]; then
         base=$requested
         start=$(resolve_base_ref "$src" "$base") || {
@@ -114,6 +117,11 @@ while read -r name _url manifest_branch <&3; do
     echo "  ${C_DIM}from $start${C_RESET}"
 done 3< <(read_manifest)
 
-prune_empty_dirs "$wt_root"
-[[ -d $wt_root ]] && echo "worktree ready: ${wt_root#"$ROOT"/}"
+if wt_set_exists "$branch"; then
+    link_settings "$branch"
+    echo "worktree ready: ${wt_root#"$ROOT"/}"
+else
+    unlink_settings "$branch"
+    prune_empty_dirs "$wt_root"
+fi
 exit "$failed"

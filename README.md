@@ -86,7 +86,7 @@ When you add or change recipes, update the "Commands" section of the adopted fil
 
 ## Commands
 
-- `just bootstrap [repo...]`: Clone repositories that are not cloned yet.
+- `just bootstrap [repo...]`: Clone repositories that are not cloned yet. Local-only repositories are reported if missing.
 - `just sync [repo...]`: Fetch, then fast-forward pull repositories without uncommitted changes.
 - `just status [repo...]`: Show branch, uncommitted changes, and ahead/behind counts (no network access).
 - `just exec '<cmd>' [repo...]`: Run a command at the root of each repository.
@@ -94,7 +94,7 @@ When you add or change recipes, update the "Commands" section of the adopted fil
 - `just wt-new <branch> [repo[@base]...]`: Create same-branch worktrees grouped under `worktrees/<branch>/`, optionally forking each repository from a different base.
 - `just wt-status <branch> [repo...]`: Show the status of a worktree set, including each repository's base and ahead/behind counts against it.
 - `just wt-list`: List worktree sets and the repositories in each.
-- `just wt-rm <branch> [--force]`: Remove a worktree set (branches are kept).
+- `just wt-rm <branch> [--force]`: Remove a worktree set, and delete branches that were never committed to or pushed.
 
 When `[repo...]` is omitted, every repository in `repos.txt` is targeted.
 
@@ -128,6 +128,10 @@ The branch name is used as the path as is, so `feature/foo` becomes the nested d
 Another branch gets its own directory, for example `worktrees/fix/bar/` from `just wt-new fix/bar repo-c`.
 One worktree set cannot sit inside another, so `just wt-new feature` fails while `feature/foo` exists, and vice versa.
 `just wt-rm` also removes parent directories that become empty, such as `worktrees/feature/`.
+Branches live in the repositories under `repos/`, not in the worktrees, so they survive the removal.
+`just wt-rm` deletes a branch only when it is unused: no commits on top of its recorded base and never pushed
+(no upstream and no `origin/<branch>`), as with a repository you only read. Branches with commits, pushed branches,
+and branches without a recorded base are kept, and each decision is printed.
 Other files in the branch directory, such as plans or notes, are never deleted; `just wt-rm` lists them as kept.
 
 Start the agent for that task inside the branch directory:
@@ -136,7 +140,10 @@ Start the agent for that task inside the branch directory:
 cd worktrees/feature/foo && claude
 ```
 
-Because `worktrees/<branch>/` sits inside the meta-repo, an agent started there still loads the workspace's root instructions.
+Because `worktrees/<branch>/` sits inside the meta-repo, an agent started there still loads the workspace's root instructions
+(`CLAUDE.md`, `AGENTS.md`) and Claude Code skills in `.claude/skills/`. Claude Code reads the shared `.claude/settings.json`
+only from the directory it starts in, so `just wt-new` links `worktrees/<branch>/.claude/settings.json` to the workspace's
+file, and `just wt-rm` removes the link again. A `settings.json` you put there yourself is never replaced or removed.
 No upstream is configured, so push the first time with `git push -u origin <branch>`.
 
 ### Base branches
@@ -166,6 +173,34 @@ repo-b                   feature/foo                      clean      v2 +1 -0   
 Open each pull request against the recorded base (for example `gh pr create --base v2` in `repo-b`).
 For a branch that already exists or already has a worktree, `repo@<base>` only updates the record.
 The record is removed together with the branch when the branch is deleted.
+
+## Local repositories
+
+`repos.txt` can also list repositories that live on your machine, in two ways.
+
+**Clone from a local path.** Any path `git clone` accepts works as the URL:
+
+```text
+baz  /Users/me/src/baz
+qux  ../qux
+```
+
+`just bootstrap` clones a copy into `repos/<name>/` whose `origin` is the original repository, so `sync`,
+`wt-new`, and `wt-status` work as with a hosted remote. Keep in mind:
+
+- Relative paths are resolved from the workspace root. `~` is not expanded, and paths cannot contain spaces.
+- Changes reach the original repository only by pushing. Git refuses a push to the branch that is checked out
+  in a non-bare repository, so push feature branches, or keep the original as a bare repository.
+
+**Local-only.** Use `-` as the URL to use a repository in place without cloning it, including one with no remote:
+
+```text
+notes  -
+```
+
+Move or create the repository at `repos/notes/` yourself; `just bootstrap` never clones it and reports it while it
+is missing. If the repository has no `origin`, `just sync` skips it and `just wt-new` forks new branches from the
+branch currently checked out in `repos/notes/`.
 
 ## Design choices
 
