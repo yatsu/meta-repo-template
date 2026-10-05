@@ -91,8 +91,8 @@ When you add or change recipes, update the "Commands" section of the adopted fil
 - `just status [repo...]`: Show branch, uncommitted changes, and ahead/behind counts (no network access).
 - `just exec '<cmd>' [repo...]`: Run a command at the root of each repository.
 - `just add <name> <url> [branch]`: Append a repository to `repos.txt` and clone it.
-- `just wt-new <branch> [repo...]`: Create same-branch worktrees grouped under `worktrees/<branch>/`.
-- `just wt-status <branch> [repo...]`: Show the status of a worktree set.
+- `just wt-new <branch> [repo[@base]...]`: Create same-branch worktrees grouped under `worktrees/<branch>/`, optionally forking each repository from a different base.
+- `just wt-status <branch> [repo...]`: Show the status of a worktree set, including each repository's base and ahead/behind counts against it.
 - `just wt-list`: List worktree sets and the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove a worktree set (branches are kept).
 
@@ -137,8 +137,35 @@ cd worktrees/feature/foo && claude
 ```
 
 Because `worktrees/<branch>/` sits inside the meta-repo, an agent started there still loads the workspace's root instructions.
-New branches start from the upstream default branch, or from the branch given in `repos.txt` if one is set.
 No upstream is configured, so push the first time with `git push -u origin <branch>`.
+
+### Base branches
+
+A new branch is forked from its base, chosen per repository in this order:
+
+1. the base given on the command line as `repo@<base>`
+2. the branch given for the repository in `repos.txt`
+3. the remote's default branch
+
+Repositories can use different bases in the same set. Here `repo-a` is forked from `main` (its default) and
+`repo-b` from `v2`:
+
+```bash
+just wt-new feature/foo repo-a repo-b@v2
+```
+
+`<base>` is looked up as `origin/<base>` first, then as a local branch, tag, or commit.
+The base is recorded in each repository's git config as `branch.<branch>.meta-base`, and `just wt-status` shows it:
+
+```text
+REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
+repo-a                   feature/foo                      clean      main +2 -0               (none)
+repo-b                   feature/foo                      clean      v2 +1 -0                 (none)
+```
+
+Open each pull request against the recorded base (for example `gh pr create --base v2` in `repo-b`).
+For a branch that already exists or already has a worktree, `repo@<base>` only updates the record.
+The record is removed together with the branch when the branch is deleted.
 
 ## Design choices
 

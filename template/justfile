@@ -24,11 +24,11 @@ exec cmd *repos:
 add name url branch="":
     @scripts/add.sh "$@"
 
-# Create same-branch worktrees under worktrees/<branch>/<repo>/
+# Create same-branch worktrees under worktrees/<branch>/<repo>/ (repo@base sets the base)
 wt-new branch *repos:
     @scripts/wt-new.sh "$@"
 
-# Show status of a worktree set
+# Show status of a worktree set, including each repo's base
 wt-status branch *repos:
     @scripts/status.sh -w "$@"
 

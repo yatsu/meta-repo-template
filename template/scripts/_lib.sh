@@ -88,3 +88,21 @@ prune_empty_dirs() {
         dir=$(dirname "$dir")
     done
 }
+
+# The base branch of a worktree branch (what it was forked from and what PRs should target)
+# is recorded per repo in git config as branch.<branch>.meta-base.
+get_base() { git -C "$1" config --get "branch.$2.meta-base" || true; }
+set_base() { git -C "$1" config "branch.$2.meta-base" "$3"; }
+
+# Print the ref to compare against for base BASE in repo DIR:
+# origin/BASE if it exists, otherwise BASE itself (local branch, tag, or commit).
+resolve_base_ref() {
+    local dir=$1 base=$2
+    if git -C "$dir" rev-parse --verify --quiet "refs/remotes/origin/$base" >/dev/null; then
+        echo "origin/$base"
+    elif git -C "$dir" rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+        echo "$base"
+    else
+        return 1
+    fi
+}

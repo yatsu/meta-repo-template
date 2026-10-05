@@ -13,7 +13,8 @@ Files at the repository root are for developing the template and are not install
   missing entries from `template/.gitignore` to the target's `.gitignore`.
 - `template/justfile`: thin wrappers only. Each recipe calls `scripts/<name>.sh "$@"` (`set positional-arguments`).
   The comment above a recipe is its `just --list` description.
-- `template/scripts/_lib.sh`: shared helpers (manifest parsing, name validation, colors). Every script sources it.
+- `template/scripts/_lib.sh`: shared helpers (manifest parsing, name validation, worktree sets, base records, colors).
+  Every script sources it. A worktree branch's base is stored in git config as `branch.<branch>.meta-base`.
 - `template/scripts/*.sh`: one script per recipe.
 - `template/repos.txt`: the manifest, `<name> <git-url> [branch]` per line, `#` comments. Ships with examples only.
 - `template/AGENTS-meta-repo.md`: instructions users adopt as their workspace's CLAUDE.md or AGENTS.md.
@@ -65,4 +66,4 @@ shellcheck -x install.sh template/scripts/*.sh
 Smoke-test in a scratch directory, never in this repository: run `install.sh` into a new directory and into an
 existing one with its own `.gitignore` and a conflicting file, then create local bare
 repositories as remotes (`git init --bare -b main`), list them in `repos.txt` with `file://` URLs, and exercise
-every recipe, including the failure paths (unknown repo name, dirty repository, existing worktree, nested worktree sets, `--force`).
+every recipe, including the failure paths (unknown repo name, dirty repository, existing worktree, nested worktree sets, missing base, `--force`).

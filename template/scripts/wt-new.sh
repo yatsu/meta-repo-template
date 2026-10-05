@@ -1,16 +1,42 @@
 #!/usr/bin/env bash
 # Create git worktrees on the same branch across repos, grouped under worktrees/<branch>/<repo>/.
 # A "/" in the branch name creates nested directories (worktrees/feature/foo/<repo>/).
-# Checks out the branch if it exists; otherwise creates it from the upstream default branch.
-# usage: wt-new.sh <branch> [repo...]   (defaults to every cloned repo)
+# Checks out the branch if it exists. Otherwise creates it from <base> when given as repo@<base>,
+# else from the branch set in repos.txt, else from the upstream default branch.
+# The base is recorded as branch.<branch>.meta-base in each repo's git config. For a repo that
+# already has the branch or the worktree, repo@<base> only updates the record.
+# usage: wt-new.sh <branch> [repo[@base]...]   (defaults to every cloned repo)
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
 
-[[ $# -ge 1 ]] || die "usage: wt-new.sh <branch> [repo...]"
+[[ $# -ge 1 ]] || die "usage: wt-new.sh <branch> [repo[@base]...]"
 branch=$1
 shift
-validate_names "$@"
 git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "invalid branch name: $branch"
+
+# Split repo@base arguments. Repo names cannot contain "@", so split at the first one.
+names=()
+bases=()
+for arg in "$@"; do
+    base=""
+    if [[ $arg == *@* ]]; then
+        base=${arg#*@}
+        [[ -n $base ]] || die "missing base after @: $arg"
+    fi
+    names+=("${arg%%@*}")
+    bases+=("$base")
+done
+validate_names ${names[@]+"${names[@]}"}
+
+explicit_base() {
+    local i
+    for ((i = 0; i < ${#names[@]}; i++)); do
+        if [[ ${names[i]} == "$1" ]]; then
+            echo "${bases[i]}"
+            return
+        fi
+    done
+}
 
 wt_root="$WORKTREES_DIR/$branch"
 
@@ -28,15 +54,20 @@ mkdir -p "$wt_root"
 
 failed=0
 while read -r name _url manifest_branch <&3; do
-    selected "$name" "$@" || continue
+    selected "$name" ${names[@]+"${names[@]}"} || continue
     src="$REPOS_DIR/$name"
     dst="$wt_root/$name"
+    requested=$(explicit_base "$name")
     if ! is_git_dir "$src"; then
         warn "$name: not cloned, skipping"
         continue
     fi
     if [[ -e $dst ]]; then
         echo "${C_DIM}skip${C_RESET}  $name (${dst#"$ROOT"/} exists)"
+        if [[ -n $requested ]]; then
+            set_base "$src" "$branch" "$requested"
+            echo "  ${C_DIM}base recorded as $requested${C_RESET}"
+        fi
         continue
     fi
 
@@ -46,22 +77,40 @@ while read -r name _url manifest_branch <&3; do
             failed=1
             continue
         }
+        # The branch keeps its history; an explicit base only updates the record
+        if [[ -n $requested ]]; then
+            set_base "$src" "$branch" "$requested"
+            echo "  ${C_DIM}existing branch, base recorded as $requested${C_RESET}"
+        else
+            recorded=$(get_base "$src" "$branch")
+            echo "  ${C_DIM}existing branch, base: ${recorded:-not recorded (set with: just wt-new $branch $name@<base>)}${C_RESET}"
+        fi
         continue
     fi
 
     git -C "$src" fetch --quiet origin 2>/dev/null || warn "$name: fetch failed, using local refs"
-    if [[ $manifest_branch != "-" ]] && git -C "$src" rev-parse --verify --quiet "origin/$manifest_branch" >/dev/null; then
-        start="origin/$manifest_branch"
+    if [[ -n $requested ]]; then
+        base=$requested
+        start=$(resolve_base_ref "$src" "$base") || {
+            warn "$name: base not found: $base"
+            failed=1
+            continue
+        }
+    elif [[ $manifest_branch != "-" ]] && git -C "$src" rev-parse --verify --quiet "refs/remotes/origin/$manifest_branch" >/dev/null; then
+        base=$manifest_branch
+        start="origin/$base"
     elif start=$(git -C "$src" rev-parse --abbrev-ref --verify --quiet origin/HEAD); then
-        :
+        base=${start#origin/}
     else
         start=HEAD
+        base=$(git -C "$src" symbolic-ref --short -q HEAD || true)
     fi
     # No upstream is set; use `git push -u origin <branch>` on the first push
     git -C "$src" worktree add --quiet --no-track -b "$branch" "$dst" "$start" || {
         failed=1
         continue
     }
+    [[ -n $base ]] && set_base "$src" "$branch" "$base"
     echo "  ${C_DIM}from $start${C_RESET}"
 done 3< <(read_manifest)
 

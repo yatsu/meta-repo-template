@@ -43,12 +43,16 @@ the recipe exits non-zero at the end if any repository failed.
 - `just add <name> <url> [branch]`: Append a repository to `repos.txt` and clone it. Ask the user before adding repositories.
 - `just exec '<cmd>' [repo...]`: Run a shell command at the root of each repository, for example `just exec 'git log -1 --oneline'`.
   Prefer it over hand-written loops for read-only checks across repositories.
-- `just wt-new <branch> [repo...]`: Create a worktree on `<branch>` for each repository under `worktrees/<branch>/<repo>/`
-  (`feature/foo` becomes `worktrees/feature/foo/<repo>/`). Uses the branch if it exists; otherwise creates it from the
-  upstream default branch, or the branch set in `repos.txt`. No upstream is set; push with `git push -u origin <branch>`.
+- `just wt-new <branch> [repo[@base]...]`: Create a worktree on `<branch>` for each repository under `worktrees/<branch>/<repo>/`
+  (`feature/foo` becomes `worktrees/feature/foo/<repo>/`). Uses the branch if it exists; otherwise forks it from the base:
+  `repo@<base>` if given, else the branch set in `repos.txt`, else the remote's default branch. Bases can differ per
+  repository, e.g. `just wt-new feature/foo repo-a repo-b@v2`. The base is recorded in git config as
+  `branch.<branch>.meta-base`; for an existing branch or worktree, `repo@<base>` only updates the record.
+  No upstream is set; push with `git push -u origin <branch>`.
   Running it again for the same branch adds worktrees for the repositories that do not have one yet.
   Fails if the set would be nested inside another set or contain one (e.g. `feature` while `feature/foo` exists).
-- `just wt-status <branch> [repo...]`: Same as `just status`, for the worktrees of `<branch>`.
+- `just wt-status <branch> [repo...]`: Same as `just status`, for the worktrees of `<branch>`, plus a BASE column with each
+  repository's recorded base and ahead/behind counts against it (`(unknown)` when no base is recorded).
 - `just wt-list`: List existing worktree sets by branch name, with the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove the worktrees of `<branch>` and any parent directories left empty. Branches are kept.
   Worktrees with uncommitted changes are skipped unless `--force` is given; only use `--force` when the user asks.
@@ -58,4 +62,7 @@ the recipe exits non-zero at the end if any repository failed.
 
 - When the session's working directory is under `worktrees/<branch>/`, edit files only there.
   Leave `repos/` alone; other work may be using it.
+- Repositories in one set may have different bases. Before rebasing, comparing, or opening a pull request, check the
+  BASE column of `just wt-status <branch>` and target that branch (e.g. `gh pr create --base v2`), not `main` by default.
+  If a base shows `(unknown)`, ask the user which branch to target.
 - Check status with `just wt-status <branch>` and clean up with `just wt-rm <branch>` once the branches are pushed or merged.
