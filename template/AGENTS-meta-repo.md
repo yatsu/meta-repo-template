@@ -30,7 +30,9 @@ The list lives in `repos.txt`. Each repository's own CLAUDE.md or AGENTS.md appl
 
 ## Commands
 
-Workspace operations are `just` recipes, run from the meta-repo root. `just --list` shows them all.
+Workspace operations are `just` recipes. `just --list` shows them all. Run them from the meta-repo root or from
+`worktrees/<branch>/`, never from inside a repository: `just` uses the nearest justfile, so a repository with its own
+justfile hides these recipes (if you must, use `just --justfile <meta-repo root>/justfile <recipe>`).
 Recipes that take `[repo...]` target every repository in `repos.txt` when no names are given,
 and fail if a name is not listed there. A failure in one repository does not stop the others;
 the recipe exits non-zero at the end if any repository failed.
@@ -53,8 +55,18 @@ the recipe exits non-zero at the end if any repository failed.
   No upstream is set; push with `git push -u origin <branch>`.
   Running it again for the same branch adds worktrees for the repositories that do not have one yet.
   Fails if the set would be nested inside another set or contain one (e.g. `feature` while `feature/foo` exists).
-- `just wt-status <branch> [repo...]`: Same as `just status`, for the worktrees of `<branch>`, plus a BASE column with each
+- `just wt-status [branch] [repo...]`: Same as `just status`, for the worktrees of `<branch>`, plus a BASE column with each
   repository's recorded base and ahead/behind counts against it (`(unknown)` when no base is recorded).
+- `just wt-log [branch] [repo...]`: List the commits each worktree has on top of its recorded base.
+- `just wt-diff [branch] [repo...] [--stat]`: Diff from each worktree's base (merge base) to its working tree,
+  uncommitted changes included. Use it to review everything a task changed.
+- `just wt-diff-head [branch] [repo...] [--stat]`: Uncommitted changes in each worktree, staged or not (`git diff HEAD`).
+- `just wt-diff-pr [branch] [repo...] [--stat]`: The diff a pull request against each worktree's base would show
+  (committed changes only). Check it before opening pull requests.
+  None of the diffs include untracked files; check `git status` for those.
+- `just wt-exec [branch] '<cmd>' [repo...]`: Run a shell command in each worktree, with `BASE` and `BASE_REF` set to the
+  recorded base and the ref to compare against (empty if unknown), and no pager.
+  Prefer it over hand-written loops, and never hard-code `main` as the base.
 - `just wt-list`: List existing worktree sets by branch name, with the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove the worktrees of `<branch>` and any parent directories left empty.
   Deletes a branch only if it has no commits on top of its recorded base and was never pushed; other branches are kept.
@@ -65,7 +77,11 @@ the recipe exits non-zero at the end if any repository failed.
 
 - When the session's working directory is under `worktrees/<branch>/`, edit files only there.
   Leave `repos/` alone; other work may be using it.
+- `[branch]` in the `wt-*` recipes above is taken from the current directory when it is inside `worktrees/<branch>/`.
+  Omit it there (`just wt-diff-pr --stat`, `just wt-log repo-a`); any arguments are then repository names.
+  Outside `worktrees/`, `[branch]` is required.
 - Repositories in one set may have different bases. Before rebasing, comparing, or opening a pull request, check the
-  BASE column of `just wt-status <branch>` and target that branch (e.g. `gh pr create --base v2`), not `main` by default.
+  BASE column of `just wt-status` and target that branch (e.g. `gh pr create --base v2`), not `main` by default.
   If a base shows `(unknown)`, ask the user which branch to target.
-- Check status with `just wt-status <branch>` and clean up with `just wt-rm <branch>` once the branches are pushed or merged.
+- Check status with `just wt-status` and clean up with `just wt-rm <branch>` (from the meta-repo root) once the branches
+  are pushed or merged.

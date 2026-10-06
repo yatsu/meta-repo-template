@@ -151,3 +151,72 @@ unlink_settings() {
         rmdir "$dir" 2>/dev/null || true
     fi
 }
+
+# Print "name dir" for each repo (in repos.txt order) that has a worktree in worktrees/<branch>/,
+# limited to the given repos if any. Named repos without a worktree are reported.
+wt_worktrees() {
+    local branch=$1 name _url _branch dir
+    shift
+    while read -r name _url _branch; do
+        selected "$name" "$@" || continue
+        dir="$WORKTREES_DIR/$branch/$name"
+        if [[ -e $dir/.git ]]; then
+            echo "$name $dir"
+        elif [[ $# -gt 0 ]]; then
+            warn "$name: no worktree in worktrees/$branch/"
+        fi
+    done < <(read_manifest)
+}
+
+# Set BASE (e.g. v2) and BASE_REF (e.g. origin/v2) for the worktree at DIR from the recorded base
+# of its current branch. Fails, leaving both empty, when no usable base is recorded.
+load_base() {
+    local current
+    BASE="" BASE_REF=""
+    current=$(git -C "$1" symbolic-ref --short -q HEAD) || return 1
+    BASE=$(get_base "$1" "$current")
+    [[ -n $BASE ]] || return 1
+    BASE_REF=$(resolve_base_ref "$1" "$BASE") || {
+        BASE_REF=""
+        return 1
+    }
+}
+
+# --color value for git output captured in a variable but printed to this script's stdout.
+git_color() { if [[ -t 1 ]]; then echo always; else echo never; fi; }
+
+# Print the worktree set that contains the directory just was invoked from (META_INVOCATION_DIR,
+# exported by the justfile), or fail when it is outside every set.
+current_wt_set() {
+    local dir wt b
+    [[ -n ${META_INVOCATION_DIR:-} && -d $META_INVOCATION_DIR && -d $WORKTREES_DIR ]] || return 1
+    dir=$(cd "$META_INVOCATION_DIR" && pwd -P)
+    wt=$(cd "$WORKTREES_DIR" && pwd -P)
+    while IFS= read -r b; do
+        case "$dir/" in "$wt/$b/"*)
+            echo "$b"
+            return 0
+            ;;
+        esac
+    done < <(list_wt_sets)
+    return 1
+}
+
+# Pick the worktree set for a wt-* script. Inside worktrees/<branch>/ the branch comes from the
+# invocation directory and the arguments are left as they are (a leading copy of that branch name
+# is skipped); elsewhere the first argument is the branch.
+# Sets BRANCH, and BRANCH_ARGC to the number of arguments the caller should shift.
+pick_branch() {
+    local inferred
+    if inferred=$(current_wt_set); then
+        BRANCH=$inferred BRANCH_ARGC=0
+        if [[ ${1:-} == "$inferred" ]]; then
+            BRANCH_ARGC=1
+        elif [[ -n ${1:-} ]] && ! manifest_has "$1" && wt_set_exists "$1"; then
+            die "running inside worktrees/$inferred/; run from the workspace root to use the set $1"
+        fi
+    else
+        [[ -n ${1:-} ]] || die "missing <branch> (or run inside worktrees/<branch>/)"
+        BRANCH=$1 BRANCH_ARGC=1
+    fi
+}

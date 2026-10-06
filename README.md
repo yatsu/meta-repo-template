@@ -92,7 +92,12 @@ When you add or change recipes, update the "Commands" section of the adopted fil
 - `just exec '<cmd>' [repo...]`: Run a command at the root of each repository.
 - `just add <name> <url> [branch]`: Append a repository to `repos.txt` and clone it.
 - `just wt-new <branch> [repo[@base]...]`: Create same-branch worktrees grouped under `worktrees/<branch>/`, optionally forking each repository from a different base.
-- `just wt-status <branch> [repo...]`: Show the status of a worktree set, including each repository's base and ahead/behind counts against it.
+- `just wt-status [branch] [repo...]`: Show the status of a worktree set, including each repository's base and ahead/behind counts against it.
+- `just wt-log [branch] [repo...]`: List the commits each worktree has on top of its base.
+- `just wt-diff [branch] [repo...] [--stat]`: Show changes since the base, uncommitted changes included.
+- `just wt-diff-head [branch] [repo...] [--stat]`: Show uncommitted changes, staged or not (like `git diff HEAD`).
+- `just wt-diff-pr [branch] [repo...] [--stat]`: Show the diff a pull request against the base would show (committed changes only).
+- `just wt-exec [branch] '<cmd>' [repo...]`: Run a command in each worktree, with `BASE` and `BASE_REF` set.
 - `just wt-list`: List worktree sets and the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove a worktree set, and delete branches that were never committed to or pushed.
 
@@ -173,6 +178,52 @@ repo-b                   feature/foo                      clean      v2 +1 -0   
 Open each pull request against the recorded base (for example `gh pr create --base v2` in `repo-b`).
 For a branch that already exists or already has a worktree, `repo@<base>` only updates the record.
 The record is removed together with the branch when the branch is deleted.
+
+### Working inside a worktree set
+
+Inside `worktrees/<branch>/` (or any directory below it), the `wt-status`, `wt-log`, `wt-diff`, `wt-diff-head`,
+`wt-diff-pr`, and `wt-exec` recipes take the branch from the current directory, so it can be omitted. Any arguments
+are then repository names:
+
+```bash
+cd worktrees/feature/foo
+```
+
+```bash
+just wt-diff-pr repo-a --stat
+```
+
+Outside `worktrees/`, pass the branch as the first argument. `wt-new` and `wt-rm` always take it explicitly.
+
+Run the recipes from the workspace root or from `worktrees/<branch>/`, not from inside a repository: `just` uses the
+nearest justfile, so a repository that has its own justfile hides these recipes. From there, pass the workspace's
+justfile explicitly, for example `just --justfile ../../../justfile wt-log` from `worktrees/fix/repo-a/`.
+
+### Reviewing changes
+
+These recipes look at every worktree of a set, each against its own base:
+
+| Recipe | Compares | Same as, per worktree |
+| ------ | -------- | --------------------- |
+| `just wt-log <branch>` | commits on top of the base | `git log --oneline <base>..HEAD` |
+| `just wt-diff <branch>` | the base to the working tree | `git diff $(git merge-base <base> HEAD)` |
+| `just wt-diff-head <branch>` | `HEAD` to the working tree | `git diff HEAD` |
+| `just wt-diff-pr <branch>` | the base to `HEAD` | `git diff <base>...HEAD` |
+
+`<base>` is the recorded base, preferring `origin/<base>`. `wt-diff` and `wt-diff-pr` start from the merge base, so
+commits added to the base after the branch was forked do not show up. Add `--stat` for a per-file summary, and
+repository names to limit the output. As with `git diff`, untracked files do not appear until they are added.
+
+For anything else, `just wt-exec` runs a command in each worktree with `BASE` (for example `v2`) and `BASE_REF`
+(for example `origin/v2`) set, and without a pager:
+
+```bash
+just wt-exec feature/foo 'git status --short'
+```
+
+```bash
+just wt-exec feature/foo 'git log --stat "$BASE_REF..HEAD"'
+```
 
 ## Local repositories
 

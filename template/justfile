@@ -1,5 +1,8 @@
 set positional-arguments
 
+# Lets wt-* recipes find the worktree set they are run from; [branch] can be omitted inside worktrees/<branch>/
+export META_INVOCATION_DIR := invocation_directory()
+
 # List recipes
 help:
     @just --list --unsorted
@@ -28,9 +31,29 @@ add name url branch="":
 wt-new branch *repos:
     @scripts/wt-new.sh "$@"
 
-# Show status of a worktree set, including each repo's base
-wt-status branch *repos:
+# [branch] [repo...]: Show status of a worktree set, including each repo's base
+wt-status *args:
     @scripts/status.sh -w "$@"
+
+# [branch] [repo...]: List commits on top of each worktree's base
+wt-log *args:
+    @scripts/wt-log.sh "$@"
+
+# [branch] [repo...] [--stat]: Diff from each worktree's base to its working tree, uncommitted included
+wt-diff *args:
+    @scripts/wt-diff.sh base "$@"
+
+# [branch] [repo...] [--stat]: Diff of uncommitted changes in each worktree, staged or not
+wt-diff-head *args:
+    @scripts/wt-diff.sh head "$@"
+
+# [branch] [repo...] [--stat]: Diff a pull request against each worktree's base would show
+wt-diff-pr *args:
+    @scripts/wt-diff.sh pr "$@"
+
+# [branch] '<cmd>' [repo...]: Run a command in each worktree, with BASE and BASE_REF set
+wt-exec *args:
+    @scripts/wt-exec.sh "$@"
 
 # List worktree sets and the repos in each
 wt-list:

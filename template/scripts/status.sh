@@ -2,18 +2,20 @@
 # Show branch, uncommitted changes, and ahead/behind counts for each repo.
 # With -w, also show each worktree's recorded base and ahead/behind against it.
 # Does not touch the network; run `just sync` first for up-to-date counts.
-# usage: status.sh [-w branch] [repo...]
+# Inside worktrees/<branch>/, -w defaults to that set.
+# usage: status.sh [-w [branch]] [repo...]
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
 
 root_dir="$REPOS_DIR"
 wt_mode=""
 if [[ ${1:-} == "-w" ]]; then
-    [[ -n ${2:-} ]] || die "usage: status.sh -w <branch> [repo...]"
-    wt_set_exists "$2" || die "no worktree set for $2 (see: just wt-list)"
-    root_dir="$WORKTREES_DIR/$2"
+    shift
+    pick_branch "$@"
+    shift "$BRANCH_ARGC"
+    wt_set_exists "$BRANCH" || die "no worktree set for $BRANCH (see: just wt-list)"
+    root_dir="$WORKTREES_DIR/$BRANCH"
     wt_mode=1
-    shift 2
 fi
 validate_names "$@"
 

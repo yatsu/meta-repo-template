@@ -5,7 +5,11 @@
       "Bash(just status)",
       "Bash(just status *)",
       "Bash(just wt-status *)",
-      "Bash(just wt-list)"
+      "Bash(just wt-list)",
+      "Bash(just wt-log *)",
+      "Bash(just wt-diff *)",
+      "Bash(just wt-diff-head *)",
+      "Bash(just wt-diff-pr *)"
     ]
   }
 }
