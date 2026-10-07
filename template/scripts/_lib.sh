@@ -220,3 +220,24 @@ pick_branch() {
         BRANCH=$1 BRANCH_ARGC=1
     fi
 }
+
+# True if BASE exists as a branch in repo DIR, locally or on origin (not just a tag or commit).
+base_is_branch() {
+    git -C "$1" show-ref --verify --quiet "refs/heads/$2" ||
+        git -C "$1" show-ref --verify --quiet "refs/remotes/origin/$2"
+}
+
+# Print the path of the worktree (or main checkout) where BRANCH is checked out in repo DIR, if any.
+checked_out_at() {
+    local dir=$1 branch=$2 line path=""
+    while IFS= read -r line; do
+        case $line in
+        "worktree "*) path=${line#worktree } ;;
+        "branch refs/heads/$branch")
+            echo "$path"
+            return 0
+            ;;
+        esac
+    done < <(git -C "$dir" worktree list --porcelain)
+    return 1
+}

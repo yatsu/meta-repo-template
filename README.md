@@ -98,6 +98,8 @@ When you add or change recipes, update the "Commands" section of the adopted fil
 - `just wt-diff-head [branch] [repo...] [--stat]`: Show uncommitted changes, staged or not (like `git diff HEAD`).
 - `just wt-diff-pr [branch] [repo...] [--stat]`: Show the diff a pull request against the base would show (committed changes only).
 - `just wt-exec [branch] '<cmd>' [repo...]`: Run a command in each worktree, with `BASE` and `BASE_REF` set.
+- `just wt-merge [branch] [repo...]`: Fast-forward each worktree's local base branch to the worktree branch, without pushing.
+- `just wt-push-base [branch] [repo...]`: Push each worktree's local base branch to origin (never forced).
 - `just wt-list`: List worktree sets and the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove a worktree set, and delete branches that were never committed to or pushed.
 
@@ -223,6 +225,113 @@ just wt-exec feature/foo 'git status --short'
 
 ```bash
 just wt-exec feature/foo 'git log --stat "$BASE_REF..HEAD"'
+```
+
+### Walkthrough: one pull request per repository
+
+The usual case. A task touches `api` (based on `main`) and `web` (based on its `v2` line), and each repository gets
+its own pull request.
+
+Create the worktree set, choosing the base per repository:
+
+```bash
+just wt-new feature/login api web@v2
+```
+
+Start an agent for the task inside it. The `wt-*` recipes run there need no branch argument:
+
+```bash
+cd worktrees/feature/login && claude
+```
+
+While working, or when done, review each repository against its own base:
+
+```bash
+just wt-status
+```
+
+```text
+REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
+api                      feature/login                    clean      main +2 -0               (none)
+web                      feature/login                    clean      v2 +1 -0                 (none)
+```
+
+```bash
+just wt-diff-pr --stat
+```
+
+`wt-diff-pr` shows what the pull requests will contain; `wt-diff` also includes uncommitted changes, and
+`wt-diff-head` shows only those. Then push each branch and open a pull request against its recorded base:
+
+```bash
+git -C api push -u origin feature/login && (cd api && gh pr create --base main)
+```
+
+```bash
+git -C web push -u origin feature/login && (cd web && gh pr create --base v2)
+```
+
+Once the pull requests are merged, remove the set from the workspace root. Pushed branches are kept:
+
+```bash
+just wt-rm feature/login
+```
+
+### Walkthrough: merging slices into a feature branch locally
+
+A larger change lives on `feature/big`, which already has (or will get) its own pull request in each repository.
+The work is split into slices, and each slice is merged into `feature/big` locally instead of getting a pull request.
+
+Create a set for the first slice, based on the feature branch:
+
+```bash
+just wt-new feature/big-part1 api@feature/big web@feature/big
+```
+
+The worktree branch name cannot sit below the base: git does not allow `feature/big` and `feature/big/part1` together,
+so use a name like `feature/big-part1`.
+
+Work and commit inside `worktrees/feature/big-part1/` as usual, review with `just wt-diff-pr`, then merge:
+
+```bash
+just wt-merge
+```
+
+`wt-merge` fast-forwards the local `feature/big` branch to the worktree branch in each repository. It changes no
+checkout and pushes nothing, so `wt-status` keeps counting the commits against `origin/feature/big`:
+
+```text
+REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
+api                      feature/big-part1                clean      feature/big +3 -0        (none)
+web                      feature/big-part1                clean      feature/big +1 -0        (none)
+```
+
+It refuses for a repository, and leaves it unchanged, when:
+
+- the worktree has uncommitted changes;
+- the base has commits the worktree branch lacks, for example a slice merged earlier or a push by someone else.
+  Rebase the worktree branch onto the ref it names (`git rebase feature/big` or `git rebase origin/feature/big`)
+  and run `just wt-merge` again;
+- the local `feature/big` and `origin/feature/big` have diverged; it prints a `git log` command to inspect both sides;
+- `feature/big` is checked out somewhere, for example under `repos/`.
+
+More slices (`feature/big-part2`, ...) are merged into the same local `feature/big` the same way. When you want the
+result on the remote, push explicitly. `wt-push-base` lists the commits and pushes without forcing:
+
+```bash
+just wt-push-base
+```
+
+```text
+REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
+api                      feature/big-part1                clean      feature/big +0 -0        (none)
+web                      feature/big-part1                clean      feature/big +0 -0        (none)
+```
+
+The slice's commits are now in `origin/feature/big`, so removing the set also deletes the worktree branches:
+
+```bash
+just wt-rm feature/big-part1
 ```
 
 ## Local repositories

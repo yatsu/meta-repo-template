@@ -55,6 +55,14 @@ wt-diff-pr *args:
 wt-exec *args:
     @scripts/wt-exec.sh "$@"
 
+# [branch] [repo...]: Fast-forward each worktree's local base branch to it, without pushing
+wt-merge *args:
+    @scripts/wt-merge.sh "$@"
+
+# [branch] [repo...]: Push each worktree's local base branch to origin (no force)
+wt-push-base *args:
+    @scripts/wt-push-base.sh "$@"
+
 # List worktree sets and the repos in each
 wt-list:
     @scripts/wt-list.sh

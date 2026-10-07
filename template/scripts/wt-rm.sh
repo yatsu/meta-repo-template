@@ -10,8 +10,14 @@ source "$(dirname "$0")/_lib.sh"
 
 [[ $# -ge 1 ]] || die "usage: wt-rm.sh <branch> [--force]"
 branch=$1
+shift
 force=""
-[[ ${2:-} == "--force" ]] && force="--force"
+for arg in "$@"; do
+    case $arg in
+    --force) force="--force" ;;
+    *) die "unexpected argument: $arg (wt-rm removes the whole set; usage: wt-rm.sh <branch> [--force])" ;;
+    esac
+done
 
 wt_root="$WORKTREES_DIR/$branch"
 wt_set_exists "$branch" || die "no worktree set for $branch (see: just wt-list)"

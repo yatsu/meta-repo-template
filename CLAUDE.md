@@ -17,9 +17,11 @@ Files at the repository root are for developing the template and are not install
   Every script sources it. A worktree branch's base is stored in git config as `branch.<branch>.meta-base`.
   `wt-new` symlinks `worktrees/<branch>/.claude/settings.json` to the root `.claude/settings.json` (Claude Code reads
   that file only from its start directory); `wt-rm` removes it and does not report it as a leftover file.
-  The justfile exports `META_INVOCATION_DIR` (`invocation_directory()`); `pick_branch` uses it so that read-only `wt-*`
+  The justfile exports `META_INVOCATION_DIR` (`invocation_directory()`); `pick_branch` uses it so that the `wt-*`
   scripts take the branch from the current worktree set and treat all arguments as repo names there.
   `wt-new` and `wt-rm` always require an explicit branch.
+  `wt-merge` moves only the local base branch ref (`update-ref` with the expected old value, fast-forward only) and
+  never pushes; `wt-push-base` pushes it without forcing. Neither is auto-allowed in `.claude/settings.json`.
 - `template/scripts/*.sh`: one script per recipe, except that `wt-diff`, `wt-diff-head`, and `wt-diff-pr` share
   `wt-diff.sh` (mode as the first argument) and `wt-status` is `status.sh -w`.
 - `template/repos.txt`: the manifest, `<name> <git-url> [branch]` per line, `#` comments. Ships with examples only.
