@@ -68,9 +68,11 @@ the recipe exits non-zero at the end if any repository failed.
   recorded base and the ref to compare against (empty if unknown), and no pager.
   Prefer it over hand-written loops, and never hard-code `main` as the base.
 - `just wt-merge [branch] [repo...]`: Merge each worktree's branch into its recorded base branch locally, fast-forward
-  only. Only the local base branch moves; nothing is checked out and nothing is pushed. Refuses per repository when the
-  worktree has uncommitted changes, the base is not a branch, the branch does not contain the base (rebase first, as the
-  message says), the local base and `origin/<base>` have diverged, or the base is checked out somewhere.
+  only, and never pushes. If `repos/<repo>` has the base checked out, that checkout is fast-forwarded so its files show
+  the merged code; otherwise only the local base branch moves. Refuses per repository when the worktree has uncommitted
+  changes, the base is not a branch, the branch does not contain the base (rebase first, as the message says), the local
+  base and `origin/<base>` have diverged, `repos/<repo>` has the base checked out with uncommitted changes, or another
+  worktree has the base checked out.
 - `just wt-push-base [branch] [repo...]`: Push each worktree's local base branch to origin, listing the commits first.
   Never forces; refuses when origin has commits the local base lacks. Run it only when the user asks to push.
 - `just wt-list`: List existing worktree sets by branch name, with the repositories in each.
@@ -113,7 +115,8 @@ have, its own pull request, e.g. `just wt-new feature/big-part1 repo-a@feature/b
 the worktree branch into that feature branch locally, not by opening a pull request for the worktree branch:
 
 1. Review with `just wt-diff-pr` (here it shows exactly what will land on the base) and commit everything.
-2. Run `just wt-merge`. It fast-forwards the local `feature/big` to the worktree branch and does not push.
+2. Run `just wt-merge`. It fast-forwards the local `feature/big` to the worktree branch and does not push. If
+   `repos/<repo>` has `feature/big` checked out, its files are updated to the merged code as well.
 3. If it reports that the base has commits the branch lacks, rebase the worktree branch onto the ref it names
    (`git rebase origin/feature/big` or `git rebase feature/big`) and run `just wt-merge` again. The worktree branch has
    not been pushed, so rebasing it is safe; if it has been pushed, ask first.
@@ -124,4 +127,5 @@ the worktree branch into that feature branch locally, not by opening a pull requ
 6. After the push, `just wt-rm <branch>` deletes the worktree branch, because its commits are now in the base.
 
 Several sets can be merged into the same feature branch one after another; a later one is rebased onto the local base
-(`git rebase feature/big`) when `just wt-merge` asks for it. Never check out the base branch under `repos/` to merge.
+(`git rebase feature/big`) when `just wt-merge` asks for it. Do not switch branches under `repos/` to merge; if
+`wt-merge` reports uncommitted changes in `repos/<repo>`, tell the user instead of committing or stashing them.

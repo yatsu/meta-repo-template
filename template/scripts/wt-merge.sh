@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Merge each worktree's branch into its recorded base branch locally, fast-forward only, without pushing.
-# Only the local base branch ref moves; no checkout is touched. Push it afterwards with wt-push-base.
+# If the base is checked out in the repo's main checkout (repos/<repo>) and that checkout has no
+# uncommitted changes, it is fast-forwarded there, so its files show the merged code. Otherwise only
+# the local base branch ref moves. Push it afterwards with wt-push-base.
 # Refuses (per repo) when the worktree has uncommitted changes, when the base is not a branch, when the
-# branch does not contain the tip of the base (rebase first), or when the base is checked out somewhere.
+# branch does not contain the tip of the base (rebase first), when the local base and origin have
+# diverged, when repos/<repo> has the base checked out with uncommitted changes, or when another
+# worktree has the base checked out.
 # usage: wt-merge.sh [branch] [repo...]   (branch defaults to the set containing the invocation directory)
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
@@ -69,14 +73,32 @@ while read -r name dir <&3; do
         echo "  ${C_DIM}already merged${C_RESET}"
         continue
     fi
-    if where=$(checked_out_at "$dir" "$BASE"); then
-        warn "$name: $BASE is checked out at ${where#"$ROOT"/}; merge there or switch that checkout away"
-        failed=1
-        continue
-    fi
 
     from=${old:-$(git -C "$dir" rev-parse --verify --quiet "refs/remotes/origin/$BASE" || true)}
     count=$(git -C "$dir" rev-list --count ${from:+"$from.."}HEAD)
+
+    if where=$(checked_out_at "$dir" "$BASE"); then
+        main=$(cd "$REPOS_DIR/$name" && pwd -P)
+        shown=${where#"$(cd "$ROOT" && pwd -P)"/}
+        if [[ $(cd "$where" && pwd -P) != "$main" ]]; then
+            warn "$name: $BASE is checked out in another worktree ($shown); merge there or switch it away"
+            failed=1
+            continue
+        fi
+        # Untracked files are fine; git refuses the merge if it would overwrite one
+        if [[ -n $(git -C "$where" status --porcelain --untracked-files=no) ]]; then
+            warn "$name: $BASE is checked out at $shown with uncommitted changes; commit or stash them first"
+            failed=1
+            continue
+        fi
+        git -C "$where" merge --ff-only --quiet "$head" || {
+            warn "$name: fast-forward of $shown failed"
+            failed=1
+            continue
+        }
+        echo "  merged $count commit(s) into $BASE, updating the checkout at $shown; not pushed (push with: just wt-push-base)"
+        continue
+    fi
     # An empty old value makes update-ref fail if the branch appeared in the meantime
     git -C "$dir" update-ref -m "wt-merge: fast-forward to $branch" "$local_ref" "$head" "$old" || {
         failed=1

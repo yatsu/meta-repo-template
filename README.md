@@ -98,7 +98,7 @@ When you add or change recipes, update the "Commands" section of the adopted fil
 - `just wt-diff-head [branch] [repo...] [--stat]`: Show uncommitted changes, staged or not (like `git diff HEAD`).
 - `just wt-diff-pr [branch] [repo...] [--stat]`: Show the diff a pull request against the base would show (committed changes only).
 - `just wt-exec [branch] '<cmd>' [repo...]`: Run a command in each worktree, with `BASE` and `BASE_REF` set.
-- `just wt-merge [branch] [repo...]`: Fast-forward each worktree's local base branch to the worktree branch, without pushing.
+- `just wt-merge [branch] [repo...]`: Fast-forward each worktree's local base branch to the worktree branch (and `repos/<repo>` if it has the base checked out), without pushing.
 - `just wt-push-base [branch] [repo...]`: Push each worktree's local base branch to origin (never forced).
 - `just wt-list`: List worktree sets and the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove a worktree set, and delete branches that were never committed to or pushed.
@@ -297,8 +297,9 @@ Work and commit inside `worktrees/feature/big-part1/` as usual, review with `jus
 just wt-merge
 ```
 
-`wt-merge` fast-forwards the local `feature/big` branch to the worktree branch in each repository. It changes no
-checkout and pushes nothing, so `wt-status` keeps counting the commits against `origin/feature/big`:
+`wt-merge` fast-forwards the local `feature/big` branch to the worktree branch in each repository and pushes
+nothing, so `wt-status` keeps counting the commits against `origin/feature/big`. If `repos/<repo>` has `feature/big`
+checked out, that checkout is fast-forwarded too, so its files show the merged code; otherwise only the branch moves:
 
 ```text
 REPO  BRANCH             CHANGES  BASE               UPSTREAM
@@ -313,7 +314,9 @@ It refuses for a repository, and leaves it unchanged, when:
   Rebase the worktree branch onto the ref it names (`git rebase feature/big` or `git rebase origin/feature/big`)
   and run `just wt-merge` again;
 - the local `feature/big` and `origin/feature/big` have diverged; it prints a `git log` command to inspect both sides;
-- `feature/big` is checked out somewhere, for example under `repos/`.
+- `feature/big` is checked out in `repos/<repo>` with uncommitted changes (untracked files are fine unless the merge
+  would overwrite them);
+- `feature/big` is checked out in another worktree, whose files would no longer match the branch.
 
 More slices (`feature/big-part2`, ...) are merged into the same local `feature/big` the same way. When you want the
 result on the remote, push explicitly. `wt-push-base` lists the commits and pushes without forcing:

@@ -20,8 +20,10 @@ Files at the repository root are for developing the template and are not install
   The justfile exports `META_INVOCATION_DIR` (`invocation_directory()`); `pick_branch` uses it so that the `wt-*`
   scripts take the branch from the current worktree set and treat all arguments as repo names there.
   `wt-new` and `wt-rm` always require an explicit branch.
-  `wt-merge` moves only the local base branch ref (`update-ref` with the expected old value, fast-forward only) and
-  never pushes; `wt-push-base` pushes it without forcing. Neither is auto-allowed in `.claude/settings.json`.
+  `wt-merge` is fast-forward only and never pushes. When `repos/<repo>` has the base checked out (and no uncommitted
+  changes) it runs `merge --ff-only` there so the files follow; otherwise it moves only the local base branch ref
+  (`update-ref` with the expected old value). A base checked out in another worktree is refused.
+  `wt-push-base` pushes the base without forcing. Neither is auto-allowed in `.claude/settings.json`.
 - `template/scripts/*.sh`: one script per recipe, except that `wt-diff`, `wt-diff-head`, and `wt-diff-pr` share
   `wt-diff.sh` (mode as the first argument) and `wt-status` is `status.sh -w`.
 - `template/repos.txt`: the manifest, `<name> <git-url> [branch]` per line, `#` comments. Ships with examples only.
