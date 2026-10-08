@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Merge each worktree's branch into its recorded base branch locally, fast-forward only, without pushing.
+# Works on local refs only and never fetches: repos/ may be developed without syncing with origin.
 # If the base is checked out in the repo's main checkout (repos/<repo>) and that checkout has no
 # uncommitted changes, it is fast-forwarded there, so its files show the merged code. Otherwise only
 # the local base branch ref moves. Push it afterwards with wt-push-base.
 # Refuses (per repo) when the worktree has uncommitted changes, when the base is not a branch, when the
-# branch does not contain the tip of the base (rebase first), when the local base and origin have
-# diverged, when repos/<repo> has the base checked out with uncommitted changes, or when another
-# worktree has the base checked out.
+# branch does not contain the tip of the local base (rebase first), when repos/<repo> has the base
+# checked out with uncommitted changes, or when another worktree has the base checked out.
 # usage: wt-merge.sh [branch] [repo...]   (branch defaults to the set containing the invocation directory)
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
@@ -30,9 +30,6 @@ while read -r name dir <&3; do
         failed=1
         continue
     fi
-    if has_origin "$dir"; then
-        git -C "$dir" fetch --quiet origin || warn "$name: fetch failed, using local refs"
-    fi
     if ! base_is_branch "$dir" "$BASE"; then
         warn "$name: base $BASE is not a branch; nothing to merge into"
         failed=1
@@ -42,27 +39,14 @@ while read -r name dir <&3; do
     local_ref="refs/heads/$BASE"
     old=$(git -C "$dir" rev-parse --verify --quiet "$local_ref" || true)
 
-    remote_ref="refs/remotes/origin/$BASE"
-    has_remote=""
-    git -C "$dir" show-ref --verify --quiet "$remote_ref" && has_remote=1
-    # Unpushed commits on the local base that origin lacks and origin commits the local base lacks
-    # cannot be fixed by a rebase here; the user has to reconcile the local base first.
-    if [[ -n $old && -n $has_remote ]] &&
-        ! git -C "$dir" merge-base --is-ancestor "$remote_ref" "$local_ref" &&
-        ! git -C "$dir" merge-base --is-ancestor "$local_ref" "$remote_ref"; then
-        warn "$name: local $BASE and origin/$BASE have diverged; reconcile local $BASE first" \
-            "(inspect: git -C ${dir#"$ROOT"/} log --oneline --left-right origin/$BASE...$BASE)"
-        failed=1
-        continue
-    fi
-
-    # Fast-forward only: the branch must already contain the base, both on origin and locally
+    # Local only, no fetch: the target is the local base branch. Only when it does not exist yet is it
+    # created from the branch, which must then contain the (last fetched) origin/<base>.
+    target_ref=$local_ref
+    [[ -n $old ]] || target_ref="refs/remotes/origin/$BASE"
     behind=""
-    if [[ -n $has_remote ]] && ! git -C "$dir" merge-base --is-ancestor "$remote_ref" HEAD; then
-        behind="origin/$BASE"
-    fi
-    if [[ -n $old ]] && ! git -C "$dir" merge-base --is-ancestor "$local_ref" HEAD; then
-        behind="$BASE"
+    if ! git -C "$dir" merge-base --is-ancestor "$target_ref" HEAD; then
+        behind=${target_ref#refs/heads/}
+        behind=${behind#refs/remotes/}
     fi
     if [[ -n $behind ]]; then
         warn "$name: $behind has commits not in $branch; rebase first: git -C ${dir#"$ROOT"/} rebase $behind"
@@ -74,8 +58,11 @@ while read -r name dir <&3; do
         continue
     fi
 
-    from=${old:-$(git -C "$dir" rev-parse --verify --quiet "refs/remotes/origin/$BASE" || true)}
+    from=$(git -C "$dir" rev-parse "$target_ref")
     count=$(git -C "$dir" rev-list --count ${from:+"$from.."}HEAD)
+
+    push_hint=""
+    has_origin "$dir" && push_hint="; not pushed (push with: just wt-push-base)"
 
     if where=$(checked_out_at "$dir" "$BASE"); then
         main=$(cd "$REPOS_DIR/$name" && pwd -P)
@@ -96,7 +83,7 @@ while read -r name dir <&3; do
             failed=1
             continue
         }
-        echo "  merged $count commit(s) into $BASE, updating the checkout at $shown; not pushed (push with: just wt-push-base)"
+        echo "  merged $count commit(s) into $BASE, updating the checkout at $shown$push_hint"
         continue
     fi
     # An empty old value makes update-ref fail if the branch appeared in the meantime
@@ -104,7 +91,7 @@ while read -r name dir <&3; do
         failed=1
         continue
     }
-    echo "  merged $count commit(s) into local $BASE; not pushed (push with: just wt-push-base)"
+    echo "  merged $count commit(s) into local $BASE$push_hint"
 done 3< <(wt_worktrees "$branch" "$@")
 
 exit "$failed"

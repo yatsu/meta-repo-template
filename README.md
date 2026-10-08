@@ -99,7 +99,7 @@ When you add or change recipes, update the "Commands" section of the adopted fil
 - `just wt-diff-pr [branch] [repo...] [--stat]`: Show the diff a pull request against the base would show (committed changes only).
 - `just wt-exec [branch] '<cmd>' [repo...]`: Run a command in each worktree, with `BASE` and `BASE_REF` set.
 - `just wt-merge [branch] [repo...]`: Fast-forward each worktree's local base branch to the worktree branch (and `repos/<repo>` if it has the base checked out), without pushing.
-- `just wt-push-base [branch] [repo...]`: Push each worktree's local base branch to origin (never forced).
+- `just wt-push-base [branch] [repo...]`: Push each worktree's local base branch to origin (never forced; repositories without a remote are skipped).
 - `just wt-list`: List worktree sets and the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove a worktree set, and delete branches that were never committed to or pushed.
 
@@ -160,6 +160,7 @@ A new branch is forked from its base, chosen per repository in this order:
 1. the base given on the command line as `repo@<base>`
 2. the branch given for the repository in `repos.txt`
 3. the remote's default branch
+4. the branch checked out in `repos/<repo>`, for a repository without a remote
 
 Repositories can use different bases in the same set. Here `repo-a` is forked from `main` (its default) and
 `repo-b` from `v2`:
@@ -168,7 +169,9 @@ Repositories can use different bases in the same set. Here `repo-a` is forked fr
 just wt-new feature/foo repo-a repo-b@v2
 ```
 
-`<base>` is looked up as `origin/<base>` first, then as a local branch, tag, or commit.
+Like `git switch -c`, `wt-new` never fetches, and `<base>` resolves to the local branch first, then to
+`origin/<base>`, then to a tag or commit. A local branch is used even when `origin` is ahead, so local work that was
+never pushed is included; run `just sync` first if you want the latest remote state.
 The base is recorded in each repository's git config as `branch.<branch>.meta-base`, and `just wt-status` shows it:
 
 ```text
@@ -212,7 +215,7 @@ These recipes look at every worktree of a set, each against its own base:
 | `just wt-diff-head <branch>` | `HEAD` to the working tree | `git diff HEAD` |
 | `just wt-diff-pr <branch>` | the base to `HEAD` | `git diff <base>...HEAD` |
 
-`<base>` is the recorded base, preferring `origin/<base>`. `wt-diff` and `wt-diff-pr` start from the merge base, so
+`<base>` is the recorded base, resolved as above (local branch first). `wt-diff` and `wt-diff-pr` start from the merge base, so
 commits added to the base after the branch was forked do not show up. Add `--stat` for a per-file summary, and
 repository names to limit the output. As with `git diff`, untracked files do not appear until they are added.
 
@@ -297,33 +300,10 @@ Work and commit inside `worktrees/feature/big-part1/` as usual, review with `jus
 just wt-merge
 ```
 
-`wt-merge` fast-forwards the local `feature/big` branch to the worktree branch in each repository and pushes
-nothing, so `wt-status` keeps counting the commits against `origin/feature/big`. If `repos/<repo>` has `feature/big`
-checked out, that checkout is fast-forwarded too, so its files show the merged code; otherwise only the branch moves:
-
-```text
-REPO  BRANCH             CHANGES  BASE               UPSTREAM
-api   feature/big-part1  clean    feature/big +3 -0  (none)
-web   feature/big-part1  clean    feature/big +1 -0  (none)
-```
-
-It refuses for a repository, and leaves it unchanged, when:
-
-- the worktree has uncommitted changes;
-- the base has commits the worktree branch lacks, for example a slice merged earlier or a push by someone else.
-  Rebase the worktree branch onto the ref it names (`git rebase feature/big` or `git rebase origin/feature/big`)
-  and run `just wt-merge` again;
-- the local `feature/big` and `origin/feature/big` have diverged; it prints a `git log` command to inspect both sides;
-- `feature/big` is checked out in `repos/<repo>` with uncommitted changes (untracked files are fine unless the merge
-  would overwrite them);
-- `feature/big` is checked out in another worktree, whose files would no longer match the branch.
-
-More slices (`feature/big-part2`, ...) are merged into the same local `feature/big` the same way. When you want the
-result on the remote, push explicitly. `wt-push-base` lists the commits and pushes without forcing:
-
-```bash
-just wt-push-base
-```
+`wt-merge` fast-forwards the local `feature/big` branch to the worktree branch in each repository. It works on local
+branches only: it never fetches, never pushes, and does not compare with `origin`, so it suits repositories developed
+without syncing with a remote. If `repos/<repo>` has `feature/big` checked out, that checkout is fast-forwarded too, so
+its files show the merged code; otherwise only the branch moves. The slice is now part of the base:
 
 ```text
 REPO  BRANCH             CHANGES  BASE               UPSTREAM
@@ -331,13 +311,37 @@ api   feature/big-part1  clean    feature/big +0 -0  (none)
 web   feature/big-part1  clean    feature/big +0 -0  (none)
 ```
 
-The slice's commits are now in `origin/feature/big`, so removing the set also deletes the worktree branches:
+It refuses for a repository, and leaves it unchanged, when:
+
+- the worktree has uncommitted changes;
+- the local `feature/big` has commits the worktree branch lacks, for example a slice merged earlier or work committed
+  in `repos/<repo>`. Rebase the worktree branch onto it (`git rebase feature/big`) and run `just wt-merge` again;
+- `feature/big` is checked out in `repos/<repo>` with uncommitted changes (untracked files are fine unless the merge
+  would overwrite them);
+- `feature/big` is checked out in another worktree, whose files would no longer match the branch.
+
+More slices (`feature/big-part2`, ...) are merged into the same local `feature/big` the same way. A new slice created
+with `repo@feature/big` starts from the local `feature/big`, including slices merged but not pushed.
+
+If the repositories have a remote and you want the result there, push explicitly. `wt-push-base` lists the commits and
+pushes the local base without forcing; repositories without an `origin` remote are skipped. Use `just status` to see
+how far the local `feature/big` in `repos/<repo>` is ahead of `origin/feature/big`:
+
+```bash
+just wt-push-base
+```
+
+The slice's commits are in the local `feature/big`, so removing the set also deletes the worktree branches, whether
+or not they were pushed:
 
 ```bash
 just wt-rm feature/big-part1
 ```
 
 ## Local repositories
+
+Nothing requires a remote. Repositories that are only used with git locally work with every recipe: `sync` skips
+them, `wt-new` forks from local branches, `wt-merge` merges locally, and `wt-push-base` skips them.
 
 `repos.txt` can also list repositories that live on your machine, in two ways.
 
@@ -362,8 +366,8 @@ notes  -
 ```
 
 Move or create the repository at `repos/notes/` yourself; `just bootstrap` never clones it and reports it while it
-is missing. If the repository has no `origin`, `just sync` skips it and `just wt-new` forks new branches from the
-branch currently checked out in `repos/notes/`.
+is missing. If the repository has no `origin`, `just sync` and `just wt-push-base` skip it, and `just wt-new` forks
+new branches from the branch currently checked out in `repos/notes/` unless a base is given.
 
 ## Design choices
 

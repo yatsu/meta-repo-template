@@ -20,6 +20,9 @@ Files at the repository root are for developing the template and are not install
   The justfile exports `META_INVOCATION_DIR` (`invocation_directory()`); `pick_branch` uses it so that the `wt-*`
   scripts take the branch from the current worktree set and treat all arguments as repo names there.
   `wt-new` and `wt-rm` always require an explicit branch.
+  Bases resolve like `git switch` (`resolve_base_ref`): local branch, then `origin/<base>`, then tag or commit.
+  `wt-new` and `wt-merge` never fetch and never compare with origin; repos may be developed without syncing with a
+  remote, or have none. Only `sync` and `wt-push-base` talk to origin, and both skip repos without one.
   `wt-merge` is fast-forward only and never pushes. When `repos/<repo>` has the base checked out (and no uncommitted
   changes) it runs `merge --ff-only` there so the files follow; otherwise it moves only the local base branch ref
   (`update-ref` with the expected old value). A base checked out in another worktree is refused.

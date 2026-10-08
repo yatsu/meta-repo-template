@@ -100,11 +100,18 @@ prune_empty_dirs() {
 get_base() { git -C "$1" config --get "branch.$2.meta-base" || true; }
 set_base() { git -C "$1" config "branch.$2.meta-base" "$3"; }
 
-# Print the ref to compare against for base BASE in repo DIR:
-# origin/BASE if it exists, otherwise BASE itself (local branch, tag, or commit).
+# Print the ref to use for base BASE in repo DIR, resolved like `git switch`: the local branch BASE
+# if it exists (even if origin is ahead), else origin/BASE, else a tag or commit. Never fetches.
 resolve_base_ref() {
     local dir=$1 base=$2
-    if git -C "$dir" rev-parse --verify --quiet "refs/remotes/origin/$base" >/dev/null; then
+    if git -C "$dir" show-ref --verify --quiet "refs/heads/$base"; then
+        # A tag with the same name would win over the branch in a bare "BASE", so qualify it then
+        if git -C "$dir" show-ref --verify --quiet "refs/tags/$base"; then
+            echo "heads/$base"
+        else
+            echo "$base"
+        fi
+    elif git -C "$dir" show-ref --verify --quiet "refs/remotes/origin/$base"; then
         echo "origin/$base"
     elif git -C "$dir" rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
         echo "$base"

@@ -2,7 +2,8 @@
 # Create git worktrees on the same branch across repos, grouped under worktrees/<branch>/<repo>/.
 # A "/" in the branch name creates nested directories (worktrees/feature/foo/<repo>/).
 # Checks out the branch if it exists. Otherwise creates it from <base> when given as repo@<base>,
-# else from the branch set in repos.txt, else from the upstream default branch.
+# else from the branch set in repos.txt, else from the remote's default branch. Like `git switch -c`,
+# it never fetches, and a base name resolves to the local branch first, then to origin/<base>.
 # The base is recorded as branch.<branch>.meta-base in each repo's git config. For a repo that
 # already has the branch or the worktree, repo@<base> only updates the record.
 # Also links worktrees/<branch>/.claude/settings.json to the workspace's .claude/settings.json.
@@ -89,9 +90,8 @@ while read -r name _url manifest_branch <&3; do
         continue
     fi
 
-    if has_origin "$src"; then
-        git -C "$src" fetch --quiet origin 2>/dev/null || warn "$name: fetch failed, using local refs"
-    fi
+    # Like `git switch -c`, no fetch: a local base branch wins over origin (run `just sync` first
+    # to pick up remote changes)
     if [[ -n $requested ]]; then
         base=$requested
         start=$(resolve_base_ref "$src" "$base") || {
@@ -99,14 +99,15 @@ while read -r name _url manifest_branch <&3; do
             failed=1
             continue
         }
-    elif [[ $manifest_branch != "-" ]] && git -C "$src" rev-parse --verify --quiet "refs/remotes/origin/$manifest_branch" >/dev/null; then
+    elif [[ $manifest_branch != "-" ]] && start=$(resolve_base_ref "$src" "$manifest_branch"); then
         base=$manifest_branch
-        start="origin/$base"
-    elif start=$(git -C "$src" rev-parse --abbrev-ref --verify --quiet origin/HEAD); then
-        base=${start#origin/}
+    elif default=$(git -C "$src" rev-parse --abbrev-ref --verify --quiet origin/HEAD) &&
+        start=$(resolve_base_ref "$src" "${default#origin/}"); then
+        base=${default#origin/}
     else
-        start=HEAD
+        # No remote default branch (e.g. a local-only repo): fork from what repos/<repo> has checked out
         base=$(git -C "$src" symbolic-ref --short -q HEAD || true)
+        start=${base:-HEAD}
     fi
     # No upstream is set; use `git push -u origin <branch>` on the first push
     git -C "$src" worktree add --quiet --no-track -b "$branch" "$dst" "$start" || {

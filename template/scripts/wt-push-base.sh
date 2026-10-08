@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Push each worktree's local base branch (as updated by wt-merge) to origin, never forcing.
+# Repos without an origin remote are skipped.
 # Lists the commits about to be pushed, and refuses when origin has commits the local base lacks.
 # usage: wt-push-base.sh [branch] [repo...]   (branch defaults to the set containing the invocation directory)
 set -euo pipefail
@@ -25,9 +26,9 @@ while read -r name dir <&3; do
         echo "  ${C_DIM}no local $BASE; nothing to push (merge with: just wt-merge)${C_RESET}"
         continue
     fi
+    # Local-only repositories have nothing to push to; that is not an error
     if ! has_origin "$dir"; then
-        warn "$name: no origin remote"
-        failed=1
+        echo "  ${C_DIM}no origin remote; skipped${C_RESET}"
         continue
     fi
     git -C "$dir" fetch --quiet origin || {

@@ -49,14 +49,17 @@ the recipe exits non-zero at the end if any repository failed.
   Prefer it over hand-written loops for read-only checks across repositories.
 - `just wt-new <branch> [repo[@base]...]`: Create a worktree on `<branch>` for each repository under `worktrees/<branch>/<repo>/`
   (`feature/foo` becomes `worktrees/feature/foo/<repo>/`). Uses the branch if it exists; otherwise forks it from the base:
-  `repo@<base>` if given, else the branch set in `repos.txt`, else the remote's default branch. Bases can differ per
+  `repo@<base>` if given, else the branch set in `repos.txt`, else the remote's default branch, else the branch checked
+  out in `repos/<repo>`. Like `git switch -c` it never fetches, and a base name resolves to the local branch first, then
+  `origin/<base>`, so unpushed local work on the base is included. Bases can differ per
   repository, e.g. `just wt-new feature/foo repo-a repo-b@v2`. The base is recorded in git config as
   `branch.<branch>.meta-base`; for an existing branch or worktree, `repo@<base>` only updates the record.
   No upstream is set; push with `git push -u origin <branch>`.
   Running it again for the same branch adds worktrees for the repositories that do not have one yet.
   Fails if the set would be nested inside another set or contain one (e.g. `feature` while `feature/foo` exists).
 - `just wt-status [branch] [repo...]`: Same as `just status`, for the worktrees of `<branch>`, plus a BASE column with each
-  repository's recorded base and ahead/behind counts against it (`(unknown)` when no base is recorded).
+  repository's recorded base and ahead/behind counts against it (`(unknown)` when no base is recorded). The base is
+  resolved the same way: the local branch if it exists, else `origin/<base>`.
 - `just wt-log [branch] [repo...]`: List the commits each worktree has on top of its recorded base.
 - `just wt-diff [branch] [repo...] [--stat]`: Diff from each worktree's base (merge base) to its working tree,
   uncommitted changes included. Use it to review everything a task changed.
@@ -68,13 +71,14 @@ the recipe exits non-zero at the end if any repository failed.
   recorded base and the ref to compare against (empty if unknown), and no pager.
   Prefer it over hand-written loops, and never hard-code `main` as the base.
 - `just wt-merge [branch] [repo...]`: Merge each worktree's branch into its recorded base branch locally, fast-forward
-  only, and never pushes. If `repos/<repo>` has the base checked out, that checkout is fast-forwarded so its files show
-  the merged code; otherwise only the local base branch moves. Refuses per repository when the worktree has uncommitted
-  changes, the base is not a branch, the branch does not contain the base (rebase first, as the message says), the local
-  base and `origin/<base>` have diverged, `repos/<repo>` has the base checked out with uncommitted changes, or another
-  worktree has the base checked out.
+  only. Works on local branches only: never fetches, never pushes, never compares with `origin`. If `repos/<repo>` has
+  the base checked out, that checkout is fast-forwarded so its files show the merged code; otherwise only the local
+  base branch moves. Refuses per repository when the worktree has uncommitted changes, the base is not a branch, the
+  local base has commits the branch lacks (rebase onto it first, as the message says), `repos/<repo>` has the base
+  checked out with uncommitted changes, or another worktree has the base checked out.
 - `just wt-push-base [branch] [repo...]`: Push each worktree's local base branch to origin, listing the commits first.
-  Never forces; refuses when origin has commits the local base lacks. Run it only when the user asks to push.
+  Never forces; refuses when origin has commits the local base lacks; skips repositories without an `origin` remote.
+  Run it only when the user asks to push.
 - `just wt-list`: List existing worktree sets by branch name, with the repositories in each.
 - `just wt-rm <branch> [--force]`: Remove the worktrees of `<branch>` and any parent directories left empty.
   Deletes a branch only if it has no commits on top of its recorded base and was never pushed; other branches are kept.
@@ -82,6 +86,9 @@ the recipe exits non-zero at the end if any repository failed.
   Other files in `worktrees/<branch>/` are never deleted and are reported as kept.
 
 ## Parallel work with worktrees
+
+Repositories do not need a remote. Some are only used with git locally; treat a missing `origin` as normal, not as
+something to fix.
 
 - When the session's working directory is under `worktrees/<branch>/`, edit files only there.
   Leave `repos/` alone; other work may be using it.
@@ -117,14 +124,13 @@ the worktree branch into that feature branch locally, not by opening a pull requ
 1. Review with `just wt-diff-pr` (here it shows exactly what will land on the base) and commit everything.
 2. Run `just wt-merge`. It fast-forwards the local `feature/big` to the worktree branch and does not push. If
    `repos/<repo>` has `feature/big` checked out, its files are updated to the merged code as well.
-3. If it reports that the base has commits the branch lacks, rebase the worktree branch onto the ref it names
-   (`git rebase origin/feature/big` or `git rebase feature/big`) and run `just wt-merge` again. The worktree branch has
-   not been pushed, so rebasing it is safe; if it has been pushed, ask first.
-4. If it reports that the local base and `origin/<base>` have diverged, stop and show the user the commits from the
-   suggested `git log` command. Do not reset or rewrite the local base yourself.
-5. Push only when the user asks: `just wt-push-base`. Until then, `just wt-status` keeps showing the commits as ahead of
-   `origin/<base>`, and `just wt-rm` keeps the worktree branch.
-6. After the push, `just wt-rm <branch>` deletes the worktree branch, because its commits are now in the base.
+3. If it reports that the local base has commits the branch lacks, rebase the worktree branch onto it
+   (`git rebase feature/big`) and run `just wt-merge` again. The worktree branch has not been pushed, so rebasing it is
+   safe; if it has been pushed, ask first.
+4. After the merge, `just wt-status` shows the base as `+0`, and `just wt-rm <branch>` deletes the worktree branch,
+   because its commits are now in the local base. Remove the set only when the user is done with it.
+5. Push only when the user asks: `just wt-push-base`. Repositories may have no remote at all, or be developed without
+   syncing with it; that is normal here, so do not fetch, pull, or push on your own to "update" the base.
 
 Several sets can be merged into the same feature branch one after another; a later one is rebased onto the local base
 (`git rebase feature/big`) when `just wt-merge` asks for it. Do not switch branches under `repos/` to merge; if
