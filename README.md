@@ -172,9 +172,9 @@ just wt-new feature/foo repo-a repo-b@v2
 The base is recorded in each repository's git config as `branch.<branch>.meta-base`, and `just wt-status` shows it:
 
 ```text
-REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
-repo-a                   feature/foo                      clean      main +2 -0               (none)
-repo-b                   feature/foo                      clean      v2 +1 -0                 (none)
+REPO    BRANCH       CHANGES  BASE        UPSTREAM
+repo-a  feature/foo  clean    main +2 -0  (none)
+repo-b  feature/foo  clean    v2 +1 -0    (none)
 ```
 
 Open each pull request against the recorded base (for example `gh pr create --base v2` in `repo-b`).
@@ -251,9 +251,9 @@ just wt-status
 ```
 
 ```text
-REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
-api                      feature/login                    clean      main +2 -0               (none)
-web                      feature/login                    clean      v2 +1 -0                 (none)
+REPO  BRANCH         CHANGES  BASE        UPSTREAM
+api   feature/login  clean    main +2 -0  (none)
+web   feature/login  clean    v2 +1 -0    (none)
 ```
 
 ```bash
@@ -301,9 +301,9 @@ just wt-merge
 checkout and pushes nothing, so `wt-status` keeps counting the commits against `origin/feature/big`:
 
 ```text
-REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
-api                      feature/big-part1                clean      feature/big +3 -0        (none)
-web                      feature/big-part1                clean      feature/big +1 -0        (none)
+REPO  BRANCH             CHANGES  BASE               UPSTREAM
+api   feature/big-part1  clean    feature/big +3 -0  (none)
+web   feature/big-part1  clean    feature/big +1 -0  (none)
 ```
 
 It refuses for a repository, and leaves it unchanged, when:
@@ -323,9 +323,9 @@ just wt-push-base
 ```
 
 ```text
-REPO                     BRANCH                           CHANGES    BASE                     UPSTREAM
-api                      feature/big-part1                clean      feature/big +0 -0        (none)
-web                      feature/big-part1                clean      feature/big +0 -0        (none)
+REPO  BRANCH             CHANGES  BASE               UPSTREAM
+api   feature/big-part1  clean    feature/big +0 -0  (none)
+web   feature/big-part1  clean    feature/big +0 -0  (none)
 ```
 
 The slice's commits are now in `origin/feature/big`, so removing the set also deletes the worktree branches:

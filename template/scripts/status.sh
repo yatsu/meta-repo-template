@@ -19,50 +19,46 @@ if [[ ${1:-} == "-w" ]]; then
 fi
 validate_names "$@"
 
-fmt="%-24s %-32s %-10s %s\n"
 header=(REPO BRANCH CHANGES UPSTREAM)
-if [[ -n $wt_mode ]]; then
-    fmt="%-24s %-32s %-10s %-24s %s\n"
-    header=(REPO BRANCH CHANGES BASE UPSTREAM)
-fi
-# shellcheck disable=SC2059
-printf "$fmt" "${header[@]}"
-while read -r name _url _branch <&3; do
-    selected "$name" "$@" || continue
-    dir="$root_dir/$name"
-    if ! is_git_dir "$dir"; then
-        # A worktree set may cover only some repos, so skip the missing ones
-        [[ -n $wt_mode ]] && continue
-        # shellcheck disable=SC2059
-        printf "$fmt" "$name" "-" "-" "(missing)"
-        continue
-    fi
-    current=$(git -C "$dir" symbolic-ref --short -q HEAD || true)
-    branch=${current:-"(detached $(git -C "$dir" rev-parse --short HEAD))"}
-    changes=$(git -C "$dir" status --porcelain | wc -l | tr -d ' ')
-    [[ $changes == 0 ]] && changes="clean"
-    if counts=$(git -C "$dir" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null); then
-        read -r behind ahead <<<"$counts"
-        upstream="$(git -C "$dir" rev-parse --abbrev-ref '@{u}') +$ahead -$behind"
-    else
-        upstream="(none)"
-    fi
-    if [[ -z $wt_mode ]]; then
-        # shellcheck disable=SC2059
-        printf "$fmt" "$name" "$branch" "$changes" "$upstream"
-        continue
-    fi
-    base=""
-    [[ -n $current ]] && base=$(get_base "$dir" "$current")
-    if [[ -z $base ]]; then
-        base_info="(unknown)"
-    elif base_ref=$(resolve_base_ref "$dir" "$base") &&
-        counts=$(git -C "$dir" rev-list --left-right --count "$base_ref...HEAD" 2>/dev/null); then
-        read -r behind ahead <<<"$counts"
-        base_info="$base +$ahead -$behind"
-    else
-        base_info="$base (not found)"
-    fi
-    # shellcheck disable=SC2059
-    printf "$fmt" "$name" "$branch" "$changes" "$base_info" "$upstream"
-done 3< <(read_manifest)
+[[ -n $wt_mode ]] && header=(REPO BRANCH CHANGES BASE UPSTREAM)
+
+# Rows are collected and printed by print_table so the columns fit their contents
+{
+    table_row "${header[@]}"
+    while read -r name _url _branch <&3; do
+        selected "$name" "$@" || continue
+        dir="$root_dir/$name"
+        if ! is_git_dir "$dir"; then
+            # A worktree set may cover only some repos, so skip the missing ones
+            [[ -n $wt_mode ]] && continue
+            table_row "$name" "-" "-" "(missing)"
+            continue
+        fi
+        current=$(git -C "$dir" symbolic-ref --short -q HEAD || true)
+        branch=${current:-"(detached $(git -C "$dir" rev-parse --short HEAD))"}
+        changes=$(git -C "$dir" status --porcelain | wc -l | tr -d ' ')
+        [[ $changes == 0 ]] && changes="clean"
+        if counts=$(git -C "$dir" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null); then
+            read -r behind ahead <<<"$counts"
+            upstream="$(git -C "$dir" rev-parse --abbrev-ref '@{u}') +$ahead -$behind"
+        else
+            upstream="(none)"
+        fi
+        if [[ -z $wt_mode ]]; then
+            table_row "$name" "$branch" "$changes" "$upstream"
+            continue
+        fi
+        base=""
+        [[ -n $current ]] && base=$(get_base "$dir" "$current")
+        if [[ -z $base ]]; then
+            base_info="(unknown)"
+        elif base_ref=$(resolve_base_ref "$dir" "$base") &&
+            counts=$(git -C "$dir" rev-list --left-right --count "$base_ref...HEAD" 2>/dev/null); then
+            read -r behind ahead <<<"$counts"
+            base_info="$base +$ahead -$behind"
+        else
+            base_info="$base (not found)"
+        fi
+        table_row "$name" "$branch" "$changes" "$base_info" "$upstream"
+    done 3< <(read_manifest)
+} | print_table

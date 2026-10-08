@@ -241,3 +241,27 @@ checked_out_at() {
     done < <(git -C "$dir" worktree list --porcelain)
     return 1
 }
+
+# Print tab-separated rows from stdin as a table: each column is padded to its widest cell
+# (the last column is not padded) and columns are separated by two spaces.
+print_table() {
+    awk -F'\t' '
+        {
+            rows[NR] = $0
+            for (i = 1; i <= NF; i++) if (length($i) > width[i]) width[i] = length($i)
+        }
+        END {
+            for (r = 1; r <= NR; r++) {
+                n = split(rows[r], cell, "\t")
+                line = ""
+                for (i = 1; i < n; i++) line = line sprintf("%-" width[i] "s  ", cell[i])
+                print line cell[n]
+            }
+        }'
+}
+
+# Print the arguments as one tab-separated row for print_table.
+table_row() {
+    local IFS=$'\t'
+    echo "$*"
+}

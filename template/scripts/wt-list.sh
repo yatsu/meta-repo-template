@@ -10,5 +10,5 @@ while IFS= read -r branch; do
         dir=${dir%/}
         [[ -e $dir/.git ]] && repos+=("$(basename "$dir")")
     done
-    printf "%-32s %s\n" "$branch" "${repos[*]}"
-done < <(list_wt_sets)
+    table_row "$branch" "${repos[*]}"
+done < <(list_wt_sets) | print_table
