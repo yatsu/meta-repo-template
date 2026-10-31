@@ -8,7 +8,7 @@ source "$(dirname "$0")/_lib.sh"
 pick_branch "$@"
 shift "$BRANCH_ARGC"
 branch=$BRANCH
-[[ $# -ge 1 ]] || die "usage: wt-exec.sh [branch] <command> [repo...]"
+[[ $# -ge 1 && $1 != -* ]] || die "usage: wt-exec.sh [branch] <command> [repo...]"
 cmd=$1
 shift
 validate_names "$@"

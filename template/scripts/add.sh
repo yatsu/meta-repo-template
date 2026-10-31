@@ -6,7 +6,9 @@ source "$(dirname "$0")/_lib.sh"
 
 [[ $# -ge 2 && $# -le 3 ]] || die "usage: add.sh <name> <url> [branch]"
 name=$1 url=$2 branch=${3:-}
-[[ $name =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid name: $name (use [A-Za-z0-9._-])"
+[[ $name =~ ^[A-Za-z0-9._-]+$ && $name != -* && $name != . && $name != .. ]] ||
+    die "invalid name: $name (use [A-Za-z0-9._-], not starting with -)"
+[[ $url == - || $url != -* ]] || die "invalid url: $url"
 manifest_has "$name" && die "$name is already in ${MANIFEST#"$ROOT"/}"
 
 # Avoid joining lines when the file lacks a trailing newline

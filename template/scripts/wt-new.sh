@@ -23,6 +23,7 @@ for arg in "$@"; do
     base=""
     if [[ $arg == *@* ]]; then
         base=${arg#*@}
+        [[ -n ${arg%%@*} ]] || die "missing repo name before @: $arg"
         [[ -n $base ]] || die "missing base after @: $arg"
     fi
     names+=("${arg%%@*}")

@@ -40,6 +40,7 @@ manifest_has() {
 validate_names() {
     local name
     for name in "$@"; do
+        [[ $name != -* ]] || die "unknown option: $name"
         manifest_has "$name" || die "unknown repo: $name (not in ${MANIFEST#"$ROOT"/})"
     done
 }
@@ -211,7 +212,7 @@ current_wt_set() {
 
 # Pick the worktree set for a wt-* script. Inside worktrees/<branch>/ the branch comes from the
 # invocation directory and the arguments are left as they are (a leading copy of that branch name
-# is skipped); elsewhere the first argument is the branch.
+# is skipped); elsewhere the first argument is the branch. An option (`--stat`) is never a branch.
 # Sets BRANCH, and BRANCH_ARGC to the number of arguments the caller should shift.
 pick_branch() {
     local inferred
@@ -219,11 +220,14 @@ pick_branch() {
         BRANCH=$inferred BRANCH_ARGC=0
         if [[ ${1:-} == "$inferred" ]]; then
             BRANCH_ARGC=1
-        elif [[ -n ${1:-} ]] && ! manifest_has "$1" && wt_set_exists "$1"; then
+        elif [[ -n ${1:-} && ${1:-} != -* ]] && ! manifest_has "$1" && wt_set_exists "$1"; then
             die "running inside worktrees/$inferred/; run from the workspace root to use the set $1"
         fi
     else
-        [[ -n ${1:-} ]] || die "missing <branch> (or run inside worktrees/<branch>/)"
+        [[ -n ${1:-} && ${1:-} != -* ]] || die "missing <branch> (or run inside worktrees/<branch>/)"
+        if ! wt_set_exists "$1" && manifest_has "$1"; then
+            die "missing <branch> before the repo name $1 (or run inside worktrees/<branch>/)"
+        fi
         BRANCH=$1 BRANCH_ARGC=1
     fi
 }

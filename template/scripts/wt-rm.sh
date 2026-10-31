@@ -4,20 +4,23 @@
 # A removed worktree's branch is deleted too when it is unused: no commits on top of its recorded
 # base and never pushed. Branches with commits, pushed branches, and branches without a base are kept.
 # Other files in the directory are kept and reported.
-# usage: wt-rm.sh <branch> [--force]
+# usage: wt-rm.sh <branch> [--force]   (in either order)
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
 
-[[ $# -ge 1 ]] || die "usage: wt-rm.sh <branch> [--force]"
-branch=$1
-shift
+branch=""
 force=""
 for arg in "$@"; do
     case $arg in
     --force) force="--force" ;;
-    *) die "unexpected argument: $arg (wt-rm removes the whole set; usage: wt-rm.sh <branch> [--force])" ;;
+    -*) die "unknown option: $arg (usage: wt-rm.sh <branch> [--force])" ;;
+    *)
+        [[ -z $branch ]] || die "unexpected argument: $arg (wt-rm removes the whole set; usage: wt-rm.sh <branch> [--force])"
+        branch=$arg
+        ;;
     esac
 done
+[[ -n $branch ]] || die "usage: wt-rm.sh <branch> [--force]"
 
 wt_root="$WORKTREES_DIR/$branch"
 wt_set_exists "$branch" || die "no worktree set for $branch (see: just wt-list)"

@@ -4,7 +4,7 @@
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
 
-[[ $# -ge 1 ]] || die "usage: exec.sh <command> [repo...]"
+[[ $# -ge 1 && $1 != -* ]] || die "usage: exec.sh <command> [repo...]"
 cmd=$1
 shift
 validate_names "$@"
