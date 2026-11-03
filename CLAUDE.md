@@ -33,6 +33,10 @@ Files at the repository root are for developing the template and are not install
   A `-` URL marks a local-only repo that `bootstrap` never clones. Decide whether to fetch by the repo's actual
   `origin` remote (`has_origin`), not by the manifest URL, since a local-only repo may still have one.
 - `template/AGENTS-meta-repo.md`: instructions users adopt as their workspace's CLAUDE.md or AGENTS.md.
+- `template/AGENTS-superpowers.md`: optional addendum for workspaces where the agent uses the superpowers plugin.
+  It overrides the superpowers skills where they assume a single repository or a single session (plan location,
+  worktree creation, subagent briefs, finishing). Users append it to the adopted instructions or delete it.
+  Keep it consistent with the sections of `AGENTS-meta-repo.md` it refers to ("Cross-repo changes", "Finishing a task").
 - `template/.claude/settings.json`: allows read-only recipes without prompts in user workspaces.
 - `template/.gitignore`: entries merged into the workspace's `.gitignore`, never copied as a file.
 - `README.md`: user documentation.

@@ -84,6 +84,24 @@ Put them where your agent reads project instructions. Pick one:
 
 When you add or change recipes, update the "Commands" section of the adopted file as well.
 
+### With the superpowers plugin
+
+`AGENTS-superpowers.md` adjusts the [superpowers](https://github.com/obra/superpowers) skills to this workspace. Those
+skills assume one repository and one session; the file tells them where the plan lives (`worktrees/<branch>/PLAN.md`),
+that `just wt-new` already provides isolation, how to brief subagents on worktree paths, and that a set is finished as
+"Finishing a task" describes rather than through the skill's own merge options.
+
+- **Using superpowers**: append `AGENTS-superpowers.md` to the file you adopted above, after the meta-repo instructions,
+  then delete it. Project instructions take precedence over superpowers' skills, so this is enough; nothing in the
+  plugin needs changing.
+
+    ```bash
+    cat AGENTS-superpowers.md >> CLAUDE.md && rm AGENTS-superpowers.md
+    ```
+
+- **Not using superpowers**: delete `AGENTS-superpowers.md`. It refers to superpowers skills by name and does nothing
+  without them.
+
 ## Commands
 
 - `just bootstrap [repo...]`: Clone repositories that are not cloned yet. Local-only repositories are reported if missing.

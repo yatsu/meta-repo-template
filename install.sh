@@ -86,6 +86,7 @@ cat <<EOF
 
 ${C_BOLD}Next steps${C_RESET} (see README.md in the template for details):
   1. Adopt AGENTS-meta-repo.md as the workspace's CLAUDE.md or AGENTS.md.
+     Append AGENTS-superpowers.md to it if the agent uses the superpowers plugin; otherwise delete it.
   2. List your repositories in repos.txt.
   3. Run 'just bootstrap' in $DEST.
 EOF
